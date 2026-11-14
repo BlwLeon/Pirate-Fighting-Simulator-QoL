@@ -1,0 +1,57 @@
+name: Build & Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: pip install pyinstaller -r launcher/requirements.txt
+
+      - name: Generate icon
+        run: python -c "import sys; sys.path.insert(0, 'launcher'); import theme; theme.icon(256).save('launcher/icon.ico', sizes=[(256,256),(64,64),(48,48),(32,32),(16,16)])"
+
+      - name: Build launcher exe
+        working-directory: launcher
+        run: pyinstaller --noconfirm --onefile --windowed --name PFS-QoL-Launcher --icon icon.ico --add-data "../mod/PFS_QoL;PFS_QoL" pfs_qol_launcher.py
+
+      - name: Package mod for manual install
+        shell: pwsh
+        run: Compress-Archive -Path mod/PFS_QoL -DestinationPath PFS_QoL-mod.zip
+
+      - name: Launcher screenshots
+        continue-on-error: true
+        working-directory: launcher
+        run: |
+          python pfs_qol_launcher.py --screenshot ../shot-main.png
+          python pfs_qol_launcher.py --screenshot ../shot-options.png --screen options
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: |
+            launcher/dist/PFS-QoL-Launcher.exe
+            PFS_QoL-mod.zip
+            shot-*.png
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: RELEASE_NOTES.md
+          files: |
+            launcher/dist/PFS-QoL-Launcher.exe
+            PFS_QoL-mod.zip
