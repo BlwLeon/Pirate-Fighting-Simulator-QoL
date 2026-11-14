@@ -93,7 +93,7 @@ pip install pyinstaller                     # build the exe (Windows)
 pyinstaller --onefile --windowed --name PFS-QoL-Launcher --add-data "../mod/PFS_QoL;PFS_QoL" pfs_qol_launcher.py
 ```
 
-Pushing a tag like `v1.0.0` builds the exe and publishes a release automatically.
+Pushing a tag like `v1.0.0` – or running the *Build & Release* workflow manually with a tag – builds the exe and publishes a release.
 
 ## Project layout
 
