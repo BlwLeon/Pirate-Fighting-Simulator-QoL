@@ -1,17 +1,16 @@
-## PFS QoL 1.0.0
+## PFS QoL 1.0.1
 
-First public release.
+### New
+- **Crosshair editor** in the launcher (*Options › Crosshair › Edit*) with zoomed and actual-size preview: colour, size, outline, centre dot, inner and outer lines.
+- **Import your VALORANT crosshair** – paste the code from *Settings › Crosshair › Primary › Export Profile Code*. You can also copy your crosshair as a VALORANT code.
+- The mod now draws a real crosshair (lines, outline, dot) instead of a `+` character.
+
+### Changed
+- The crosshair is only shown while you are alive – no more crosshair over menus or the spawn screen.
+
+### Updating
+Start the new **`PFS-QoL-Launcher.exe`** and click **Update QoL (1.0.1)**. Your hotkeys, language and fair-play setting are kept. Every player in the lobby should update.
 
 ### Downloads
-- **`PFS-QoL-Launcher.exe`** – recommended. Finds the game via Steam, installs UE4SS + the mod, starts the game with QoL or vanilla, lets you change hotkeys, language and the fair-play lock.
-- **`PFS_QoL-mod.zip`** – the mod folder for manual installation (needs [UE4SS 3.0.1](https://github.com/UE4SS-RE/RE-UE4SS/releases/tag/v3.0.1)).
-
-### Features
-- Crosshair
-- HP as a number
-- Kill feed with distance, killer's HP left, victim's ended kill streak and bananas eaten
-- Death notice (who, how far, HP left)
-- Fair-play lock: only active when every player in the lobby uses the helper
-- German / English in-game texts
-
-Every player in the lobby needs the mod. See the [README](https://github.com/BlwLeon/Pirate-Fighting-Simulator-QoL#readme) for details.
+- **`PFS-QoL-Launcher.exe`** – recommended (installs/updates UE4SS + the mod, Vanilla/QoL start, options, crosshair editor).
+- **`PFS_QoL-mod.zip`** – mod folder for manual installation (needs [UE4SS 3.0.1](https://github.com/UE4SS-RE/RE-UE4SS/releases/tag/v3.0.1)).

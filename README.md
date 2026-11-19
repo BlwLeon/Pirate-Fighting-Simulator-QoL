@@ -14,7 +14,7 @@ Quality-of-life overlay for **private lobbies** in [Pirate Fighting Simulator](h
 
 | Feature | What it does |
 |---|---|
-| **Crosshair** | A clean `+` in the centre of the screen (the game has none). |
+| **Crosshair** | Fully customisable crosshair (the game has none) – lines, outline, centre dot, colours. **Import your VALORANT crosshair code.** |
 | **HP as a number** | `HP 73 / 100` instead of just a bar – turns yellow / red when low. |
 | **Kill feed with details** | `Pedi > Blitzbube4   25 m   (75 HP left) · ended a 4 streak · 2 bananas` |
 | **Death notice** | When *you* die: who killed you, how much HP they had left and from how far away. |
@@ -61,6 +61,21 @@ The status line in the top-left corner shows whether QoL is active (`QoL active 
   <img src="docs/launcher-options.png" width="640" alt="Launcher options">
 </p>
 
+## Crosshair editor
+
+**Launcher › Options › Crosshair › Edit** opens the editor with a zoomed and an actual-size preview.
+
+- Colour (VALORANT's presets or any hex colour), size, outline, centre dot, inner and outer lines (length, separate vertical length, thickness, offset, opacity)
+- **Import Valorant** – in VALORANT go to *Settings › Crosshair › Primary › Export Profile Code*, then paste the code (e.g. `0;P;c;5;h;0;0l;4;0o;2;0a;1;0f;0;1b;0`). Values the code leaves out use VALORANT's defaults, just like in the game.
+- **Copy as Code** – exports your crosshair as a VALORANT code.
+- Sizes are pixels at 1080p and scale with the resolution, like in VALORANT. Dynamic parts (movement/firing error) are ignored.
+
+The crosshair is only shown while you are alive (not in menus or on the spawn screen).
+
+<p align="center">
+  <img src="docs/launcher-crosshair.png" width="640" alt="Crosshair editor">
+</p>
+
 ## The fair-play lock
 
 The helper appends ` [QoL]` to your player name. Every helper checks the names of all players in the lobby and only switches on when **all** of them carry the tag. If someone without the helper joins, the overlay turns off for everyone.
@@ -101,6 +116,7 @@ Pushing a tag like `v1.0.0` – or running the *Build & Release* workflow manual
 mod/PFS_QoL/          UE4SS Lua mod (main.lua, config.lua)
 launcher/             Python launcher (Tkinter + Pillow)
   core.py             Steam detection, install, mode switch, settings
+  crosshair.py        crosshair model, VALORANT code import/export, geometry
   theme.py            procedurally drawn artwork in the game's style
   pfs_qol_launcher.py GUI
 .github/workflows/    build & release

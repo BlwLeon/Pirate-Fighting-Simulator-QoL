@@ -688,9 +688,14 @@ local function renderUI()
     setText(u.status, statusText)
     setVisible(u.status, enabledByUser and statusText ~= "")
 
-    for _, e in ipairs(u.xh) do setVisible(e.img, show and cfg.SHOW_CROSSHAIR) end
-
     local me = localKey and players[localKey]
+    -- Crosshair nur, wenn die eigene Spielfigur lebt (nicht im Menü / Spawn-Bildschirm)
+    local xhOn = show and cfg.SHOW_CROSSHAIR and me ~= nil and me.alive
+    if xhOn ~= u.xhVisible then
+        u.xhVisible = xhOn
+        for _, e in ipairs(u.xh) do setVisible(e.img, xhOn) end
+    end
+
     if show and cfg.SHOW_HP and me and me.hp and me.alive then
         local mx = me.maxSeen
         local s = "HP " .. fmtNum(math.max(me.hp, 0))
