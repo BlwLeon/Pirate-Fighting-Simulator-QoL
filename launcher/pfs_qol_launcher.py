@@ -20,9 +20,10 @@ from tkinter import filedialog
 from PIL import ImageTk
 
 import core
+import crosshair as X
 import theme
 
-LAUNCHER_VERSION = "1.0.0"
+LAUNCHER_VERSION = "1.0.1"
 W, H = 960, 600
 BTN_W, BTN_H = 300, 40
 
@@ -67,6 +68,7 @@ class Launcher:
         self.images: dict[str, list] = {}       # keep Tk image references alive
         self.busy = False
         self.key_capture = None
+        self.entry = None
 
         families = set(tkfont.families())
         fam = next((f for f in ("Palatino Linotype", "Georgia", "Book Antiqua", "DejaVu Serif", "Times New Roman")
@@ -90,6 +92,8 @@ class Launcher:
 
         if screen == "options":
             self.show_options()
+        elif screen == "crosshair":
+            self.show_crosshair()
         else:
             self.show_main()
         self.root.after(300, self._check_permissions)
@@ -108,7 +112,7 @@ class Launcher:
     def _load_settings(self) -> dict:
         if self.game_dir and core.config_path(core.win64_dir(self.game_dir)).exists():
             return core.read_settings(core.win64_dir(self.game_dir))
-        return dict(core.DEFAULT_SETTINGS)
+        return dict(core.DEFAULT_SETTINGS, crosshair=X.default())
 
     def status(self) -> core.Status:
         return core.get_status(self.game_dir)
@@ -120,6 +124,9 @@ class Launcher:
     def clear(self, group: str = "ui"):
         self.canvas.delete(group)
         self.images.pop(group, None)
+        if group == "dialog" and self.entry is not None:
+            self.entry.destroy()
+            self.entry = None
 
     def text(self, x, y, s, group="ui", font=None, fill="#f4ecd6", anchor="nw", width=None):
         return self.canvas.create_text(x, y, text=s, font=font or self.f_text, fill=fill, anchor=anchor,
@@ -324,11 +331,13 @@ class Launcher:
         theme.draw_smallcaps(ImageDraw.Draw(title), (0, 0), "Options", 36, theme.GOLD)
         self.image((W - tw) // 2, 52, title)
 
-        pw, ph = 700, 430
-        px, py = (W - pw) // 2, 108
+        pw, ph = 700, 450
+        px, py = (W - pw) // 2, 100
         self.image(px, py, theme.panel(pw, ph))
 
         rows = [
+            ("Crosshair", "Shape, colour, outline – or import your VALORANT crosshair.",
+             "Edit", self.show_crosshair),
             ("Toggle overlay key", "Shows / hides the QoL overlay in game.",
              core.key_label(s["toggle_key"]), lambda: self.capture_key("toggle_key", "Toggle overlay")),
             ("Debug dump key", "Writes debug info into UE4SS.log.",
@@ -344,7 +353,7 @@ class Launcher:
             self.text(px + 40, y + 24, hint, font=self.f_small, fill="#c8b496")
             style = "danger" if (label == "Fair-play lock" and not s["require_all"]) else "normal"
             self.button(px + pw - 240, y + 2, value, cmd, w=190, h=42, style=style, size=20)
-            y += 66
+            y += 58
 
         game = str(self.game_dir) if self.game_dir else "not found"
         self.text(px + 40, y + 2, "Game folder", font=(self.f_bold[0], 15, "bold"))
@@ -421,6 +430,204 @@ class Launcher:
         if name in core.GAME_KEYS:
             self.toast(f"Careful: the game itself uses {core.key_label(name)}.", "#e2aa54", ms=7000)
 
+
+    # ------------------------------------------------------------------ crosshair editor
+    def show_crosshair(self, keep_backup: bool = False):
+        if not keep_backup:
+            self._xh_backup = X.copy.deepcopy(self.settings["crosshair"])
+        self.clear("ui")
+        xh = self.settings["crosshair"]
+        from PIL import Image, ImageDraw
+        tw = theme.smallcaps_size("Crosshair", 34)[0]
+        title = Image.new("RGBA", (tw + 10, 48), (0, 0, 0, 0))
+        theme.draw_smallcaps(ImageDraw.Draw(title), (0, 0), "Crosshair", 34, theme.GOLD)
+        self.image((W - tw) // 2, 14, title)
+
+        # ---- left: previews
+        lx, ly = 24, 64
+        self.image(lx, ly, theme.panel(400, 404))
+        self.image(lx + 20, ly + 20, theme.crosshair_preview(xh, 356, 236, 4))
+        self.text(lx + 26, ly + 24, "Zoom ×4", font=self.f_small, fill="#2a1a0c")
+        self.image(lx + 20, ly + 264, theme.crosshair_preview(xh, 356, 96, 1))
+        self.text(lx + 26, ly + 268, "Actual size (1080p)", font=self.f_small, fill="#2a1a0c")
+        self.button(lx, 478, "Import Valorant", self.import_valorant, w=196, h=38, size=18)
+        self.button(lx + 204, 478, "Copy as Code", self.copy_valorant, w=196, h=38, size=18)
+        self.button(lx, 524, "Reset", self.reset_crosshair, w=196, h=38, size=18)
+
+        # ---- right: settings
+        rx, ry = 440, 64
+        self.image(rx, ry, theme.panel(500, 452))
+        hx, tx, ax, bx = rx + 20, rx + 124, rx + 196, rx + 350
+        y = ry + 22
+        bold = (self.f_bold[0], 13, "bold")
+
+        # colour swatches
+        self.text(hx, y + 4, "Colour", font=bold)
+        cur = xh["COLOR"].upper()[:6]
+        for i, col in enumerate(X.PRESET_COLORS):
+            sx = tx + i * 30
+            item = self.canvas.create_rectangle(sx, y + 2, sx + 22, y + 24, fill="#" + col,
+                                                outline="#e2aa54" if col == cur else "#1c0f07",
+                                                width=3 if col == cur else 1, tags=("ui",))
+            self.canvas.tag_bind(item, "<Button-1>", lambda e, c=col: self._xh_set("COLOR", c + "FF"))
+        custom = cur not in X.PRESET_COLORS
+        self.canvas.create_rectangle(tx + 244, y + 2, tx + 266, y + 24, fill="#" + cur,
+                                     outline="#e2aa54" if custom else "#1c0f07", width=3 if custom else 1, tags=("ui",))
+        self.button(tx + 274, y, "Custom", self.custom_color, w=84, h=28, size=14)
+        y += 40
+
+        self.text(hx, y + 4, "Size", font=bold)
+        self._stepper(ax, y, "Scale", xh, "SCALE")
+        y += 40
+
+        def group(title, on_key, a, b, sub=None):
+            nonlocal y
+            self.text(hx, y + 4, title, font=bold)
+            target = xh[sub] if sub else xh
+            on = target[on_key]
+            self.button(tx, y, "On" if on else "Off",
+                        lambda: self._xh_toggle(sub, on_key), w=64, h=28,
+                        style="normal" if on else "danger", size=14)
+            if a: self._stepper(ax, y, a[0], target, a[1], sub)
+            if b: self._stepper(bx, y, b[0], target, b[1], sub)
+            y += 40
+
+        group("Outline", "OUTLINE", ("Thick", "OUTLINE_THICKNESS"), ("Opacity", "OUTLINE_OPACITY"))
+        group("Center dot", "DOT", ("Thick", "DOT_THICKNESS"), ("Opacity", "DOT_OPACITY"))
+        for title, sub in (("Inner lines", "INNER"), ("Outer lines", "OUTER")):
+            group(title, "SHOW", ("Opacity", "OPACITY"), None, sub)
+            self._stepper(ax, y, "Length", xh[sub], "LENGTH", sub)
+            self._stepper(bx, y, "V-Length", xh[sub], "VLENGTH", sub)
+            y += 36
+            self._stepper(ax, y, "Thick", xh[sub], "THICKNESS", sub)
+            self._stepper(bx, y, "Offset", xh[sub], "OFFSET", sub)
+            y += 42
+
+        self.button(rx + 90, 528, "Cancel", self.cancel_crosshair, w=150, h=40)
+        self.button(rx + 260, 528, "Save", self.save_crosshair, w=150, h=40)
+
+    def _fmt_val(self, key, v):
+        if key == "SCALE":
+            return f"{v:g}×"
+        if "OPACITY" in key:
+            return f"{v:.2f}"
+        return str(int(v))
+
+    def _stepper(self, x, y, label, target, key, sub=None):
+        lo, hi, step = X.RANGES[key]
+        self.text(x, y + 6, label, font=self.f_small, fill="#c8b496")
+
+        def change(d):
+            v = round(min(hi, max(lo, target[key] + d * step)), 3)
+            if isinstance(lo, int) and isinstance(step, int):
+                v = int(v)
+            if key == "LENGTH" and sub and target["VLENGTH"] == target["LENGTH"]:
+                target["VLENGTH"] = v          # keep vertical length linked
+            target[key] = v
+            self.show_crosshair(keep_backup=True)
+
+        self.button(x + 58, y + 2, "-", lambda: change(-1), w=26, h=26, size=16)
+        self.text(x + 58 + 26 + 24, y + 15, self._fmt_val(key, target[key]), anchor="center", font=self.f_text)
+        self.button(x + 58 + 26 + 48, y + 2, "+", lambda: change(1), w=26, h=26, size=16)
+
+    def _xh_set(self, key, value):
+        self.settings["crosshair"][key] = value
+        self.show_crosshair(keep_backup=True)
+
+    def _xh_toggle(self, sub, key):
+        t = self.settings["crosshair"][sub] if sub else self.settings["crosshair"]
+        t[key] = not t[key]
+        self.show_crosshair(keep_backup=True)
+
+    def reset_crosshair(self):
+        self.settings["crosshair"] = X.default()
+        self.show_crosshair(keep_backup=True)
+
+    def cancel_crosshair(self):
+        self.settings["crosshair"] = getattr(self, "_xh_backup", None) or X.default()
+        self.show_options()
+
+    def save_crosshair(self):
+        if self.game_dir and self.status().mod:
+            try:
+                core.write_settings(core.win64_dir(self.game_dir), {"crosshair": self.settings["crosshair"]})
+            except OSError as e:
+                self.toast(f"Could not save: {e}", "#e26050")
+                return
+            self.toast("Crosshair saved. Restart the game if it is running.", "#9ad0a8")
+        else:
+            self.toast("Install QoL first – the crosshair will be used after installing.", "#e2aa54")
+        self.show_options()
+
+    def input_dialog(self, title: str, hint: str, initial: str, on_ok, ok_label: str = "OK"):
+        g = "dialog"
+        self.clear(g)
+        self.image(0, 0, theme.dim(W, H), g)
+        pw, ph = 640, 230
+        px, py = (W - pw) // 2, (H - ph) // 2
+        self.image(px, py, theme.panel(pw, ph), g)
+        self.text(W // 2, py + 34, title, group=g, anchor="center", font=(self.f_bold[0], 17, "bold"), fill="#e2aa54")
+        self.text(W // 2, py + 64, hint, group=g, anchor="center", font=self.f_small, fill="#c8b496", width=pw - 60)
+        self.entry = tk.Entry(self.root, font=self.f_text, bg="#1c0f07", fg="#f4ecd6", insertbackground="#f4ecd6",
+                              relief="flat", highlightthickness=2, highlightbackground="#966834",
+                              highlightcolor="#e2aa54")
+        self.entry.insert(0, initial)
+        self.canvas.create_window(W // 2, py + 108, window=self.entry, width=pw - 80, height=34, tags=(g,))
+        self.entry.focus_set()
+        self.entry.select_range(0, "end")
+
+        def ok(_e=None):
+            value = self.entry.get().strip() if self.entry else ""
+            self.clear(g)
+            on_ok(value)
+
+        self.entry.bind("<Return>", ok)
+        self.entry.bind("<Escape>", lambda e: self.clear(g))
+        self.button(W // 2 - 190, py + ph - 66, ok_label, ok, w=180, h=40, group=g, size=19)
+        self.button(W // 2 + 10, py + ph - 66, "Cancel", lambda: self.clear(g), w=180, h=40, group=g, size=19)
+
+    def import_valorant(self):
+        try:
+            clip = self.root.clipboard_get().strip()
+        except Exception:
+            clip = ""
+        initial = clip if clip.startswith("0;") else ""
+
+        def apply(code):
+            if not code:
+                return
+            try:
+                self.settings["crosshair"] = X.from_valorant(code)
+            except X.CrosshairCodeError as e:
+                self.toast(str(e), "#e26050", ms=8000)
+                return
+            self.show_crosshair(keep_backup=True)
+            self.toast("VALORANT crosshair imported – press Save to use it.", "#9ad0a8")
+
+        self.input_dialog("Import VALORANT crosshair",
+                          "In VALORANT: Settings › Crosshair › Primary › Export Profile Code, then paste it here.",
+                          initial, apply, ok_label="Import")
+
+    def copy_valorant(self):
+        code = X.to_valorant(self.settings["crosshair"])
+        self.root.clipboard_clear()
+        self.root.clipboard_append(code)
+        self.toast("Copied – paste it in VALORANT via “Import Profile Code”.", "#9ad0a8")
+
+    def custom_color(self):
+        def apply(value):
+            if not value:
+                return
+            try:
+                self.settings["crosshair"]["COLOR"] = X._hex(value)
+            except X.CrosshairCodeError as e:
+                self.toast(str(e), "#e26050")
+                return
+            self.show_crosshair(keep_backup=True)
+
+        self.input_dialog("Custom colour", "Hex colour like FF8800 (or FF8800CC with transparency).",
+                          self.settings["crosshair"]["COLOR"][:6], apply)
+
     def save_options(self):
         try:
             core.write_settings(core.win64_dir(self.game_dir), self.settings)
@@ -437,7 +644,8 @@ class Launcher:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--screenshot", help="render a screen, save it as PNG and exit (for CI)")
-    ap.add_argument("--screen", default="main", choices=["main", "options"])
+    ap.add_argument("--screen", default="main", choices=["main", "options", "crosshair"])
+    ap.add_argument("--xh-code", help="VALORANT code to show in the crosshair editor (for CI screenshots)")
     args = ap.parse_args()
 
     if sys.platform == "win32":
@@ -447,7 +655,10 @@ def main():
             pass
 
     root = tk.Tk()
-    Launcher(root, args.screen)
+    app = Launcher(root, "main" if args.xh_code else args.screen)
+    if args.xh_code:
+        app.settings["crosshair"] = X.from_valorant(args.xh_code)
+        app.show_crosshair()
 
     if args.screenshot:
         def shot():

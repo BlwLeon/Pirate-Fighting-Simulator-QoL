@@ -43,6 +43,7 @@ jobs:
         run: |
           python pfs_qol_launcher.py --screenshot ../shot-main.png
           python pfs_qol_launcher.py --screenshot ../shot-options.png --screen options
+          python pfs_qol_launcher.py --screenshot ../shot-crosshair.png --screen crosshair --xh-code "0;P;c;5;h;1;d;1;z;2;0l;5;0o;3;0a;1;0f;0;1t;2;1l;3;1o;12;1a;0.6;1m;0;1f;0"
 
       - name: Publish screenshots to branch ci-screenshots (manual runs only)
         if: github.event_name == 'workflow_dispatch' && inputs.tag == ''
@@ -53,7 +54,7 @@ jobs:
           git config user.email "github-actions@users.noreply.github.com"
           git checkout --orphan ci-screenshots
           git rm -rf --cached . | Out-Null
-          git add -f shot-main.png shot-options.png
+          git add -f shot-main.png shot-options.png shot-crosshair.png
           git commit -m "Launcher screenshots from CI"
           git push -f origin ci-screenshots
 

@@ -27,10 +27,18 @@ return {
     SHOW_STREAK     = true,   -- victim's ended kill streak
     SHOW_BANANAS    = true,   -- bananas the victim ate in that life
 
-    -- Crosshair
-    CROSSHAIR_TEXT  = "+",
-    CROSSHAIR_SIZE  = 26,
-    CROSSHAIR_COLOR = { R = 1.0, G = 1.0, B = 1.0, A = 0.9 },
+    -- [launcher] Crosshair – easiest to edit in the launcher (Options > Crosshair),
+    -- which can also import VALORANT crosshair codes. Sizes are in pixels at 1080p.
+    -- [crosshair-begin] (written by the launcher's crosshair editor)
+    CROSSHAIR = {
+        COLOR = "FFFFFFFF",
+        OUTLINE = true, OUTLINE_THICKNESS = 1, OUTLINE_OPACITY = 0.5,
+        DOT = false, DOT_THICKNESS = 2, DOT_OPACITY = 1,
+        INNER = { SHOW = true, LENGTH = 4, VLENGTH = 4, THICKNESS = 2, OFFSET = 2, OPACITY = 1 },
+        OUTER = { SHOW = false, LENGTH = 2, VLENGTH = 2, THICKNESS = 2, OFFSET = 10, OPACITY = 0.35 },
+        SCALE = 1,
+    },
+    -- [crosshair-end]
 
     -- HP display (offset from the bottom-left corner)
     HP_SIZE   = 28,

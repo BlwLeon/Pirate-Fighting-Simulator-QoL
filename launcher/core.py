@@ -20,6 +20,8 @@ import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import crosshair
+
 APP_ID = "2186400"
 GAME_DIR_NAME = "Pirate Fighting Simulator"
 EXE_NAME = "PirateFS-Win64-Shipping.exe"
@@ -380,6 +382,7 @@ def config_path(w: Path) -> Path:
 
 def read_settings(w: Path) -> dict:
     s = dict(DEFAULT_SETTINGS)
+    s["crosshair"] = crosshair.default()
     p = config_path(w)
     if not p.exists():
         return s
@@ -388,6 +391,9 @@ def read_settings(w: Path) -> dict:
         m = re.search(pat, text)
         if m:
             s[key] = (m.group(2) == "true") if key == "require_all" else m.group(2)
+    xh = crosshair.from_lua_block(text)
+    if xh:
+        s["crosshair"] = xh
     return s
 
 
@@ -405,6 +411,8 @@ def write_settings(w: Path, settings: dict) -> None:
                 text = re.sub(pat, lambda m: m.group(1) + val, text, count=1)
         elif key == "language":  # older config without LANGUAGE line
             text = text.replace("return {", f'return {{\n    LANGUAGE = "{val}",', 1)
+    if settings.get("crosshair"):
+        text = crosshair.replace_block(text, settings["crosshair"])
     p.write_text(text, encoding="utf-8")
 
 

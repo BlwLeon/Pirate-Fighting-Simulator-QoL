@@ -180,6 +180,7 @@ def title(text_top: str = "Pirate Fighting", text_main: str = "Simulator", sub: 
 
 
 # ---- buttons -------------------------------------------------------------------
+@lru_cache(maxsize=512)
 def button(w: int, h: int, label: str, state: str = "normal", size: int = 22) -> Image.Image:
     if state == "hover":
         top, bottom, rim = BTN_HOVER, BTN_HOVER_DARK, BTN_HOVER_RIM
@@ -253,4 +254,43 @@ def icon(size: int = 256) -> Image.Image:
     ty = (s - (bbox[3] - bbox[1])) // 2 - bbox[1] - s // 30
     d.text((tx + s // 40, ty + s // 40), "Q", font=f, fill=(20, 10, 4, 200))
     d.text((tx, ty), "Q", font=f, fill=GOLD + (255,))
+    return img
+
+
+# ---- crosshair preview -----------------------------------------------------------
+def _scene(w: int, h: int) -> Image.Image:
+    """Simple 'in-game' backdrop: sky, sea and a wooden deck."""
+    img = Image.new("RGB", (w, h))
+    d = ImageDraw.Draw(img)
+    horizon = int(h * 0.55)
+    for y in range(horizon):
+        t = y / horizon
+        d.line([0, y, w, y], fill=(int(120 + 80 * t), int(170 + 50 * t), int(220 + 20 * t)))
+    for y in range(horizon, h):
+        t = (y - horizon) / (h - horizon)
+        d.line([0, y, w, y], fill=(int(30 + 20 * t), int(90 + 20 * t), int(120 - 30 * t)))
+    deck = int(h * 0.78)
+    d.rectangle([0, deck, w, h], fill=(120, 72, 38))
+    for x in range(0, w, max(8, w // 12)):
+        d.line([x, deck, x, h], fill=(70, 40, 20), width=2)
+    return img
+
+
+def crosshair_preview(xh: dict, w: int, h: int, zoom: int = 1) -> Image.Image:
+    """Render the crosshair like the mod does (same rectangles, same rounding),
+    magnified `zoom` times so single pixels are visible."""
+    import math
+
+    import crosshair as X
+
+    gw, gh = max(1, w // zoom), max(1, h // zoom)        # size in game pixels
+    img = _scene(w, h).convert("RGBA")
+    cx, cy = gw // 2, gh // 2
+    for left, top, rw, rh, rgb, alpha in X.rects(xh):
+        x0, y0 = math.floor(cx + left), math.floor(cy + top)
+        x1, y1 = x0 + max(1, round(rw)), y0 + max(1, round(rh))
+        lay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        ImageDraw.Draw(lay).rectangle([x0 * zoom, y0 * zoom, x1 * zoom - 1, y1 * zoom - 1],
+                                      fill=rgb + (int(255 * max(0.0, min(1.0, alpha))),))
+        img.alpha_composite(lay)
     return img

@@ -5,7 +5,7 @@
 -- ============================================================
 local cfg = require("config")
 
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 local TAG = "[PFS_QoL] "
 
 -- ------------------------------------------------------------
@@ -499,6 +499,82 @@ local function viewportSize()
     return w / sc, h / sc, w, h, sc
 end
 
+-- ------------------------------------------------------------
+--  Crosshair (gleiche Geometrie wie launcher/crosshair.py: rects())
+-- ------------------------------------------------------------
+local XH_DEFAULT = {
+    COLOR = "FFFFFFFF",
+    OUTLINE = true, OUTLINE_THICKNESS = 1, OUTLINE_OPACITY = 0.5,
+    DOT = false, DOT_THICKNESS = 2, DOT_OPACITY = 1,
+    INNER = { SHOW = true, LENGTH = 4, VLENGTH = 4, THICKNESS = 2, OFFSET = 2, OPACITY = 1 },
+    OUTER = { SHOW = false, LENGTH = 2, VLENGTH = 2, THICKNESS = 2, OFFSET = 10, OPACITY = 0.35 },
+    SCALE = 1,
+}
+
+local function xhConfig()
+    local c = {}
+    local src = cfg.CROSSHAIR or {}
+    for k, v in pairs(XH_DEFAULT) do
+        if type(v) == "table" then
+            c[k] = {}
+            for k2, v2 in pairs(v) do
+                local s2 = src[k] and src[k][k2]
+                if s2 == nil then c[k][k2] = v2 else c[k][k2] = s2 end
+            end
+        else
+            if src[k] == nil then c[k] = v else c[k] = src[k] end
+        end
+    end
+    return c
+end
+
+local function hexColor(h)
+    h = tostring(h or "FFFFFFFF"):gsub("#", "")
+    if #h == 6 then h = h .. "FF" end
+    local function ch(i) return (tonumber(h:sub(i, i + 1), 16) or 255) / 255 end
+    return ch(1), ch(3), ch(5), ch(7)
+end
+
+-- Liste von { left, top, w, h, r, g, b, a } relativ zur Bildschirmmitte.
+-- Erst alle Outlines, dann die Füllungen.
+local function crosshairRects(c)
+    local r, g, b, a = hexColor(c.COLOR)
+    local s = c.SCALE or 1
+    local ot = c.OUTLINE and c.OUTLINE_THICKNESS or 0
+    local outlines, fills = {}, {}
+    local function add(cx, cy, w, h, alpha)
+        if w <= 0 or h <= 0 or alpha <= 0 then return end
+        fills[#fills + 1] = { (cx - w / 2) * s, (cy - h / 2) * s, w * s, h * s, r, g, b, alpha * a }
+        if ot > 0 and c.OUTLINE_OPACITY > 0 then
+            local ow, oh = w + 2 * ot, h + 2 * ot
+            outlines[#outlines + 1] = { (cx - ow / 2) * s, (cy - oh / 2) * s, ow * s, oh * s, 0, 0, 0, c.OUTLINE_OPACITY }
+        end
+    end
+    if c.DOT then add(0, 0, c.DOT_THICKNESS, c.DOT_THICKNESS, c.DOT_OPACITY) end
+    for _, L in ipairs({ c.INNER, c.OUTER }) do
+        if L.SHOW then
+            local t, l, v, o, op = L.THICKNESS, L.LENGTH, L.VLENGTH, L.OFFSET, L.OPACITY
+            add(o + l / 2, 0, l, t, op)
+            add(-(o + l / 2), 0, l, t, op)
+            add(0, o + v / 2, t, v, op)
+            add(0, -(o + v / 2), t, v, op)
+        end
+    end
+    local all = {}
+    for _, q in ipairs(outlines) do all[#all + 1] = q end
+    for _, q in ipairs(fills) do all[#all + 1] = q end
+    return all
+end
+
+local function round(x) return math.floor(x + 0.5) end
+
+local function placeRect(slot, x, y, w, h)
+    try("XH.SetAutoSize", function() slot:SetAutoSize(false) end)
+    try("XH.SetAlignment", function() slot:SetAlignment({ X = 0, Y = 0 }) end)
+    try("XH.SetPosition", function() slot:SetPosition({ X = x, Y = y }) end)
+    try("XH.SetSize", function() slot:SetSize({ X = w, Y = h }) end)
+end
+
 local function makeText(tree, canvas, name, size, align)
     uiCounter = uiCounter + 1
     local tb = StaticConstructObject(StaticFindObject("/Script/UMG.TextBlock"), tree, FName("PFSQoL_" .. name .. uiCounter))
@@ -527,8 +603,16 @@ local function buildUI()
         u.slots[#u.slots + 1] = { key = key, slot = slot, align = align }
         return tb
     end
-    u.cross = add("cross", cfg.CROSSHAIR_SIZE, { X = 0.5, Y = 0.5 })
-    setText(u.cross, cfg.CROSSHAIR_TEXT); setColor(u.cross, cfg.CROSSHAIR_COLOR)
+    -- Crosshair aus einfarbigen Image-Widgets (Outlines zuerst = darunter)
+    u.xh = {}
+    local imgClass = StaticFindObject("/Script/UMG.Image")
+    for i, q in ipairs(crosshairRects(xhConfig())) do
+        uiCounter = uiCounter + 1
+        local img = StaticConstructObject(imgClass, w.WidgetTree, FName("PFSQoL_XH" .. i .. "_" .. uiCounter))
+        local slot = canvas:AddChildToCanvas(img)
+        try("XH.SetColor", function() img:SetColorAndOpacity({ R = q[5], G = q[6], B = q[7], A = q[8] }) end)
+        u.xh[#u.xh + 1] = { img = img, slot = slot, rect = q }
+    end
     u.hp = add("hp", cfg.HP_SIZE, { X = 0, Y = 1 })
     u.status = add("status", 13, { X = 0, Y = 0 })
     setColor(u.status, { R = 0.85, G = 0.85, B = 0.85, A = 0.75 })
@@ -567,14 +651,21 @@ local function relayout(u, force)
         local x, y = targetPos(e.key, W, H)
         place(e.slot, e.align, x, y)
     end
-    -- Diagnose: wo ist das Crosshair wirklich gelandet?
-    local p = try("GetPosition", function() return u.slots[1].slot:GetPosition() end)
-    local al = try("GetAlignment", function() return u.slots[1].slot:GetAlignment() end)
-    local an = try("GetAnchors", function() local a = u.slots[1].slot:GetAnchors(); return a.Minimum.X .. "," .. a.Minimum.Y end)
+    -- Crosshair: gleiche Rundung wie die Launcher-Vorschau
+    local cx, cy = math.floor(W / 2), math.floor(H / 2)
+    for _, e in ipairs(u.xh or {}) do
+        local q = e.rect
+        placeRect(e.slot, math.floor(cx + q[1]), math.floor(cy + q[2]), math.max(1, round(q[3])), math.max(1, round(q[4])))
+    end
+    -- Diagnose: wo ist das erste Crosshair-Rechteck gelandet?
+    local first = u.xh and u.xh[1]
+    local p = first and try("GetPosition", function() return first.slot:GetPosition() end)
+    local sz = first and try("GetSize", function() return first.slot:GetSize() end)
     log(string.format("Layout: Viewport %dx%d px, Scale %.2f -> %dx%d Einheiten",
         math.floor(pw), math.floor(ph), sc, math.floor(W), math.floor(H)),
-        "| Crosshair Pos:", p and (tostring(p.X) .. "," .. tostring(p.Y)) or "?",
-        "Align:", al and (tostring(al.X) .. "," .. tostring(al.Y)) or "?", "Anker:", tostring(an))
+        "| Crosshair-Teile:", #(u.xh or {}),
+        "| erstes Pos:", p and (tostring(p.X) .. "," .. tostring(p.Y)) or "?",
+        "Groesse:", sz and (tostring(sz.X) .. "x" .. tostring(sz.Y)) or "?")
 end
 
 local function ensureUI()
@@ -597,7 +688,7 @@ local function renderUI()
     setText(u.status, statusText)
     setVisible(u.status, enabledByUser and statusText ~= "")
 
-    setVisible(u.cross, show and cfg.SHOW_CROSSHAIR)
+    for _, e in ipairs(u.xh) do setVisible(e.img, show and cfg.SHOW_CROSSHAIR) end
 
     local me = localKey and players[localKey]
     if show and cfg.SHOW_HP and me and me.hp and me.alive then
