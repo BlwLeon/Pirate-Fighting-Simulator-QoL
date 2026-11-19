@@ -444,20 +444,20 @@ class Launcher:
         self.image((W - tw) // 2, 14, title)
 
         # ---- left: previews
-        lx, ly = 24, 64
-        self.image(lx, ly, theme.panel(400, 404))
-        self.image(lx + 20, ly + 20, theme.crosshair_preview(xh, 356, 236, 4))
+        lx, ly = 20, 64
+        self.image(lx, ly, theme.panel(364, 404))
+        self.image(lx + 20, ly + 20, theme.crosshair_preview(xh, 320, 236, 4))
         self.text(lx + 26, ly + 24, "Zoom ×4", font=self.f_small, fill="#2a1a0c")
-        self.image(lx + 20, ly + 264, theme.crosshair_preview(xh, 356, 96, 1))
+        self.image(lx + 20, ly + 264, theme.crosshair_preview(xh, 320, 96, 1))
         self.text(lx + 26, ly + 268, "Actual size (1080p)", font=self.f_small, fill="#2a1a0c")
-        self.button(lx, 478, "Import Valorant", self.import_valorant, w=196, h=38, size=18)
-        self.button(lx + 204, 478, "Copy as Code", self.copy_valorant, w=196, h=38, size=18)
-        self.button(lx, 524, "Reset", self.reset_crosshair, w=196, h=38, size=18)
+        self.button(lx, 478, "Import Valorant", self.import_valorant, w=178, h=38, size=16)
+        self.button(lx + 182, 478, "Copy as Code", self.copy_valorant, w=178, h=38, size=16)
+        self.button(lx, 524, "Reset", self.reset_crosshair, w=178, h=38, size=16)
 
         # ---- right: settings
-        rx, ry = 440, 64
-        self.image(rx, ry, theme.panel(500, 452))
-        hx, tx, ax, bx = rx + 20, rx + 124, rx + 196, rx + 350
+        rx, ry = 396, 64
+        self.image(rx, ry, theme.panel(548, 452))
+        hx, tx, ax, bx = rx + 20, rx + 112, rx + 184, rx + 354
         y = ry + 22
         bold = (self.f_bold[0], 13, "bold")
 
@@ -503,8 +503,8 @@ class Launcher:
             self._stepper(bx, y, "Offset", xh[sub], "OFFSET", sub)
             y += 42
 
-        self.button(rx + 90, 528, "Cancel", self.cancel_crosshair, w=150, h=40)
-        self.button(rx + 260, 528, "Save", self.save_crosshair, w=150, h=40)
+        self.button(rx + 110, 528, "Cancel", self.cancel_crosshair, w=150, h=40)
+        self.button(rx + 280, 528, "Save", self.save_crosshair, w=150, h=40)
 
     def _fmt_val(self, key, v):
         if key == "SCALE":
@@ -526,9 +526,10 @@ class Launcher:
             target[key] = v
             self.show_crosshair(keep_backup=True)
 
-        self.button(x + 58, y + 2, "-", lambda: change(-1), w=26, h=26, size=16)
-        self.text(x + 58 + 26 + 24, y + 15, self._fmt_val(key, target[key]), anchor="center", font=self.f_text)
-        self.button(x + 58 + 26 + 48, y + 2, "+", lambda: change(1), w=26, h=26, size=16)
+        lw = 66   # label column
+        self.button(x + lw, y + 2, "-", lambda: change(-1), w=26, h=26, size=16)
+        self.text(x + lw + 26 + 22, y + 15, self._fmt_val(key, target[key]), anchor="center", font=self.f_text)
+        self.button(x + lw + 26 + 44, y + 2, "+", lambda: change(1), w=26, h=26, size=16)
 
     def _xh_set(self, key, value):
         self.settings["crosshair"][key] = value
